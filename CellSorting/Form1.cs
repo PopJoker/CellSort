@@ -34,21 +34,20 @@ namespace CellSorting
             {
                 ctl.Anchor = AnchorStyles.Top | AnchorStyles.Left;
             }
+            cbboxSwithMode.SelectedIndex = 0;
         }
 
         private int groupSize;
         private double vLimit;
         private double rLimit;
         private int dLimit;
+        private int cLimit;
 
-        private System.Windows.Forms.ProgressBar progressBar1;
-        private System.Windows.Forms.Label lblStatus;
+        private bool fakeMode = false; // 模擬模式開啟
 
-        private bool fakeMode = true; // 模擬模式開啟
-
-        private List<BatteryCell> ImportOrFake(string filePath)
+        private List<BatteryCell> ImportOrFake(string filePath, string mode)
         {
-            var list = ImportFromExcel(filePath);
+            var list = ImportFromExcel(filePath, mode);
 
             if (fakeMode)
             {
@@ -56,34 +55,21 @@ namespace CellSorting
 
                 foreach (var cell in list)
                 {
-                    // 如果 ID 是空，就生成
                     if (string.IsNullOrWhiteSpace(cell.ID))
                     {
-                        // 使用今天日期 + 序號生成唯一 ID
                         cell.ID = $"GA0125A-{DateTime.Today:yyMMdd}{serial:D4}";
-
-                        // 模擬日期：今天往前 0~14 天
                         cell.Date = DateTime.Today.AddDays(-serial % 15);
-
                         serial++;
                     }
                 }
             }
             else
             {
-                // 正式模式：如果 ID 有值，解析日期
                 foreach (var cell in list)
                 {
                     if (!string.IsNullOrWhiteSpace(cell.ID))
                     {
-                        try
-                        {
-                            cell.Date = ParseDateFromId(cell.ID);
-                        }
-                        catch
-                        {
-                            cell.Date = DateTime.Today; // 解析失敗就給今天
-                        }
+                        cell.Date = ParseDateFromId(cell.ID, mode);
                     }
                 }
             }
@@ -91,24 +77,27 @@ namespace CellSorting
             return list;
         }
 
+
         public class BatteryCell
         {
             public string ID { get; set; }
             public double Voltage { get; set; }
             public double Resistance { get; set; }
+            public double Capacity { get; set; } // 新增容量
             public DateTime Date { get; set; }
             public int? Pack { get; set; } // 分組結果
             public string RejectReason { get; set; }
 
             // 新增完整欄位
-            public double DeltaV { get; set; }      // 電壓差
-            public int DeltaDay { get; set; }       // 日期差
-            public int GroupSize { get; set; }      // 分組大小
-            public double VoltageLimit { get; set; } // 電壓上限
-            public double IRLimit { get; set; }      // 內阻上限
-            public int DayLimit { get; set; }        // 日期限制
+            public double DeltaV { get; set; }
+            public int DeltaDay { get; set; }
+            public double DeltaCapacity { get; set; } // 新增 Δ容量
+            public int GroupSize { get; set; }
+            public double VoltageLimit { get; set; }
+            public double IRLimit { get; set; }
+            public int DayLimit { get; set; }
+            public double CapacityLimit { get; set; } // 分組容量差上限
         }
-
 
         private static readonly Dictionary<char, int> Base31Map = new Dictionary<char, int>
         {
@@ -117,58 +106,33 @@ namespace CellSorting
             {'L',20},{'M',21},{'N',22},{'P',23},{'R',24},{'S',25},{'T',26},{'U',27},{'V',28},{'W',29},{'X',30},{'Y',31}
         };
 
-        //private DateTime ParseDateFromId(string id)
-        //{
-        //    // 範例 ID: GA0125A-2564021204
-        //    // 最後幾碼 "2564021204"
-        //    string core = id.Split('-').Last();
-
-        //    // 第3碼是月份（例如 6 = 六月）
-        //    // 第4碼是日期（例如 4 = 4日）
-        //    // 但你給的例子要看實際格式，我先假設是這樣
-        //    int year = 2020 + (core[0] - '0');  // 例如 25 => 2025
-        //    int month = Base31Map[core[2]];
-        //    int day = Base31Map[core[3]];
-
-        //    return new DateTime(year, month, day);
-        //}
-        private DateTime ParseDateFromId(string id)
-        {
-            // 範例 ID: GA0125A-2564021204
-            string core = id.Split('-').LastOrDefault();
-            if (string.IsNullOrWhiteSpace(core) || core.Length < 4)
-                return DateTime.Today;
-
-            try
-            {
-                // 年份：前兩碼
-                int year = 2000 + int.Parse(core.Substring(0, 2));
-
-                // 月份與日期：第三、第四碼使用 Base31Map
-                int month = Base31Map.ContainsKey(core[2]) ? Base31Map[core[2]] : 1;
-                int day = Base31Map.ContainsKey(core[3]) ? Base31Map[core[3]] : 1;
-
-                return new DateTime(year, month, day);
-            }
-            catch
-            {
-                return DateTime.Today;
-            }
-        }
 
         private async void btnImport_Click(object sender, EventArgs e)
         {
-            // 讀取設定值
-            groupSize = int.Parse(txtCellNum.Text);
-            rLimit = double.Parse(txtIR.Text);
-            vLimit = double.Parse(txtVdelta.Text);
-            dLimit = int.Parse(txtDDelta.Text);
+            string mode = cbboxSwithMode.SelectedItem?.ToString() ?? "EVE";
 
-            // 1️⃣ UI 執行緒選檔
+            // 讀取設定值
+            if (!int.TryParse(txtCellNum.Text, out groupSize))
+            {
+                MessageBox.Show("請輸入有效的分組數字！");
+                return;
+            }
+
+            if (!double.TryParse(txtIR.Text, out rLimit))
+                rLimit = 0;
+
+            if (!double.TryParse(txtVdelta.Text, out vLimit))
+                vLimit = 0;
+
+            if (!int.TryParse(txtDDelta.Text, out dLimit))
+                dLimit = 0;
+
+            if ((mode == "EVE") && !int.TryParse(txtCapacityDelta.Text, out cLimit))
+                cLimit = 0;
+
             var ofd = new OpenFileDialog { Filter = "Excel Files|*.xlsx;*.xls" };
             if (ofd.ShowDialog() != DialogResult.OK) return;
 
-            // 2️⃣ UI 執行緒選儲存檔名
             string savePath = null;
             using (var sfd = new SaveFileDialog { Filter = "Excel Files|*.xlsx", FileName = $"CellSortingResult_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx" })
             {
@@ -176,38 +140,77 @@ namespace CellSorting
                 savePath = sfd.FileName;
             }
 
-            // 3️⃣ UI 更新
             btnImport.Enabled = false;
             progressBar1.Value = 0;
             lblStatus.Text = "開始匯入...";
 
             try
             {
-                // 匯入
                 var cells = await Task.Run(() =>
                 {
                     UpdateProgress(10, "匯入 Excel...");
-                    var list = ImportOrFake(ofd.FileName);
+                    var list = ImportOrFake(ofd.FileName, mode);
+
+                    if (list == null) return null;
+
+                    foreach (var cell in list)
+                    {
+                        if (!string.IsNullOrWhiteSpace(cell.ID))
+                        {
+                            try
+                            {
+                                cell.Date = ParseDateFromId(cell.ID, mode);
+                            }
+                            catch
+                            {
+                                cell.Date = DateTime.Today;
+                            }
+                        }
+                    }
+
                     UpdateProgress(30, "匯入完成");
                     return list;
                 });
 
                 if (cells == null) return;
 
-                // 分組
                 var groups = await Task.Run(() =>
                 {
                     UpdateProgress(40, "開始分組...");
-                    var res = GroupCells(cells, groupSize, vLimit, rLimit, dLimit);
-                    UpdateProgress(70, "分組完成");
-                    return res;
+
+                    try
+                    {
+                        if (mode == "Gus")
+                        {
+                            // Gus 模式：不檢查容量差，也不做 ID 分類
+                            return GroupCells(cells, groupSize, vLimit, rLimit, dLimit);
+                        }
+                        else if (mode == "EVE")
+                        {
+                            // EVE 模式：檢查容量差、依 ID 解析日期
+                            return GroupCellsEVE(cells, groupSize, vLimit, rLimit, dLimit, cLimit);
+                        }
+                        else
+                        {
+                            // 其他模式 → 預設 Gus 行為
+                            return GroupCells(cells, groupSize, vLimit, rLimit, dLimit);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // 捕捉所有異常，避免 UI thread 無法返回
+                        MessageBox.Show($"分組過程發生錯誤：{ex.Message}",
+                                        "錯誤",
+                                        MessageBoxButtons.OK,
+                                        MessageBoxIcon.Error);
+                        return new List<List<BatteryCell>>();
+                    }
                 });
 
-                // 匯出
                 await Task.Run(() =>
                 {
                     UpdateProgress(75, "開始匯出...");
-                    ExportToExcelToPath(groups, cells, savePath); // ⚠ 傳路徑，不用 Dialog
+                    ExportToExcelToPath(groups, cells, savePath, mode);
                     UpdateProgress(100, "完成!");
                 });
 
@@ -220,83 +223,214 @@ namespace CellSorting
             }
         }
 
-        private void ExportToExcelToPath(List<List<BatteryCell>> groups, List<BatteryCell> allCells, string path)
+        private DateTime ParseDateFromId(string id, string mode)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return DateTime.Today;
+
+            if (mode == "EVE")
+            {
+                if (id.Length < 8) return DateTime.Today;
+                try
+                {
+                    char yearChar = id[5];
+                    char monthChar = id[6];
+                    char dayChar = id[7];
+
+                    int year = Base31Map.ContainsKey(yearChar) ? 2000 + Base31Map[yearChar] : 2000;
+                    int month = Base31Map.ContainsKey(monthChar) ? Base31Map[monthChar] : 1;
+                    int day = Base31Map.ContainsKey(dayChar) ? Base31Map[dayChar] : 1;
+
+                    return new DateTime(year, month, day);
+                }
+                catch
+                {
+                    return DateTime.Today;
+                }
+            }
+            else if (mode == "Gus")
+            {
+                string core = id.Split('-').LastOrDefault();
+                if (string.IsNullOrWhiteSpace(core) || core.Length < 4)
+                    return DateTime.Today;
+
+                try
+                {
+                    int year = 2000 + int.Parse(core.Substring(0, 2));
+
+                    char monthChar = core[2];
+                    int month = Char.IsDigit(monthChar) ? int.Parse(monthChar.ToString()) : (Base31Map.ContainsKey(monthChar) ? Base31Map[monthChar] : 1);
+
+                    char dayChar = core[3];
+                    int day = Char.IsDigit(dayChar) ? int.Parse(dayChar.ToString()) : (Base31Map.ContainsKey(dayChar) ? Base31Map[dayChar] : 1);
+
+                    return new DateTime(year, month, day);
+                }
+                catch
+                {
+                    return DateTime.Today;
+                }
+            }
+
+            // fallback
+            return DateTime.Today;
+        }
+
+        private void ExportToExcelToPath(List<List<BatteryCell>> groups, List<BatteryCell> allCells, string path, string mode)
         {
             using (var workbook = new XLWorkbook())
             {
-                // ======= 成功分組 =======
                 var wsSuccess = workbook.Worksheets.Add("Success");
+                var wsFail = workbook.Worksheets.Add("Rejects");
 
-                // 標題欄位
-                wsSuccess.Cell(1, 1).Value = "Pack";
-                wsSuccess.Cell(1, 2).Value = "ID";
-                wsSuccess.Cell(1, 3).Value = "Voltage";
-                wsSuccess.Cell(1, 4).Value = "Resistance";
-                wsSuccess.Cell(1, 5).Value = "Date";
-                wsSuccess.Cell(1, 6).Value = "DeltaV";
-                wsSuccess.Cell(1, 7).Value = "DeltaDay";
-                wsSuccess.Cell(1, 8).Value = "GroupSize";
-                wsSuccess.Cell(1, 9).Value = "VoltageLimit";
-                wsSuccess.Cell(1, 10).Value = "IRLimit";
-                wsSuccess.Cell(1, 11).Value = "DayLimit";
+                int col = 1;
 
+                // ======= 設定標題 =======
+                wsSuccess.Cell(1, col++).Value = "Pack";
+                wsSuccess.Cell(1, col++).Value = "ID";
+                wsSuccess.Cell(1, col++).Value = "Resistance(Ω)";
+                wsSuccess.Cell(1, col++).Value = "Voltage(V)";
+
+                if (mode == "EVE")
+                {
+                    wsSuccess.Cell(1, col++).Value = "Capacity";
+                }
+
+                wsSuccess.Cell(1, col++).Value = "Date";
+                wsSuccess.Cell(1, col++).Value = "DeltaV(mV)";
+                wsSuccess.Cell(1, col++).Value = "DeltaDay";
+
+                if (mode == "EVE")
+                {
+                    wsSuccess.Cell(1, col++).Value = "DeltaCapacity";
+                }
+
+                wsSuccess.Cell(1, col++).Value = "GroupSize";
+                wsSuccess.Cell(1, col++).Value = "VoltageLimit(mV)";
+                wsSuccess.Cell(1, col++).Value = "IRLimit(mΩ)";
+                wsSuccess.Cell(1, col++).Value = "DayLimit";
+
+                if (mode == "EVE")
+                {
+                    wsSuccess.Cell(1, col++).Value = "CapacityLimit";
+                }
+
+                // ======= 填入成功分組 =======
                 int row = 2;
                 foreach (var group in groups)
                 {
                     foreach (var cell in group)
                     {
-                        wsSuccess.Cell(row, 1).Value = cell.Pack;
-                        wsSuccess.Cell(row, 2).Value = cell.ID;
-                        wsSuccess.Cell(row, 3).Value = cell.Voltage;
-                        wsSuccess.Cell(row, 4).Value = cell.Resistance;
-                        wsSuccess.Cell(row, 5).Value = cell.Date;
-                        wsSuccess.Cell(row, 6).Value = cell.DeltaV;
-                        wsSuccess.Cell(row, 7).Value = cell.DeltaDay;
-                        wsSuccess.Cell(row, 8).Value = cell.GroupSize;
-                        wsSuccess.Cell(row, 9).Value = cell.VoltageLimit;
-                        wsSuccess.Cell(row, 10).Value = cell.IRLimit;
-                        wsSuccess.Cell(row, 11).Value = cell.DayLimit;
+                        col = 1;
+                        wsSuccess.Cell(row, col++).Value = cell.Pack;
+                        wsSuccess.Cell(row, col++).Value = cell.ID;
+                        wsSuccess.Cell(row, col++).Value = cell.Resistance;
+                        wsSuccess.Cell(row, col++).Value = cell.Voltage;
+
+                        if (mode == "EVE")
+                            wsSuccess.Cell(row, col++).Value = cell.Capacity;
+
+                        wsSuccess.Cell(row, col++).Value = cell.Date;
+                        wsSuccess.Cell(row, col++).Value = cell.DeltaV;
+                        wsSuccess.Cell(row, col++).Value = cell.DeltaDay;
+
+                        if (mode == "EVE")
+                            wsSuccess.Cell(row, col++).Value = cell.DeltaCapacity;
+
+                        wsSuccess.Cell(row, col++).Value = cell.GroupSize;
+                        wsSuccess.Cell(row, col++).Value = cell.VoltageLimit;
+                        wsSuccess.Cell(row, col++).Value = cell.IRLimit;
+                        wsSuccess.Cell(row, col++).Value = cell.DayLimit;
+
+                        if (mode == "EVE")
+                            wsSuccess.Cell(row, col++).Value = cell.CapacityLimit;
+
                         row++;
                     }
                 }
                 wsSuccess.Columns().AdjustToContents();
 
-                // ======= 失敗電芯 =======
-                var wsFail = workbook.Worksheets.Add("Rejects");
-                wsFail.Cell(1, 1).Value = "ID";
-                wsFail.Cell(1, 2).Value = "Voltage";
-                wsFail.Cell(1, 3).Value = "Resistance";
-                wsFail.Cell(1, 4).Value = "Date";
-                wsFail.Cell(1, 5).Value = "Reason";
-                wsFail.Cell(1, 6).Value = "DeltaV";
-                wsFail.Cell(1, 7).Value = "DeltaDay";
-                wsFail.Cell(1, 8).Value = "GroupSize";
-                wsFail.Cell(1, 9).Value = "VoltageLimit";
-                wsFail.Cell(1, 10).Value = "IRLimit";
-                wsFail.Cell(1, 11).Value = "DayLimit";
+                // ======= 填入失敗電芯 =======
+                col = 1;
+                wsFail.Cell(1, col++).Value = "ID";
+                wsFail.Cell(1, col++).Value = "Resistance(Ω)";
+                wsFail.Cell(1, col++).Value = "Voltage(V)";
+
+                if (mode == "EVE")
+                    wsFail.Cell(1, col++).Value = "Capacity";
+
+                wsFail.Cell(1, col++).Value = "Date";
+                wsFail.Cell(1, col++).Value = "Reason";
+                wsFail.Cell(1, col++).Value = "DeltaV(mV)";
+                wsFail.Cell(1, col++).Value = "DeltaDay";
+
+                if (mode == "EVE")
+                    wsFail.Cell(1, col++).Value = "DeltaCapacity";
+
+                wsFail.Cell(1, col++).Value = "GroupSize";
+                wsFail.Cell(1, col++).Value = "VoltageLimit(mV)";
+                wsFail.Cell(1, col++).Value = "IRLimit(mΩ)";
+                wsFail.Cell(1, col++).Value = "DayLimit";
+
+                if (mode == "EVE")
+                    wsFail.Cell(1, col++).Value = "CapacityLimit";
 
                 row = 2;
                 foreach (var cell in allCells.Where(c => c.Pack == null))
                 {
-                    wsFail.Cell(row, 1).Value = cell.ID;
-                    wsFail.Cell(row, 2).Value = cell.Voltage;
-                    wsFail.Cell(row, 3).Value = cell.Resistance;
-                    wsFail.Cell(row, 4).Value = cell.Date;
-                    wsFail.Cell(row, 5).Value = cell.RejectReason;
-                    wsFail.Cell(row, 6).Value = cell.DeltaV;
-                    wsFail.Cell(row, 7).Value = cell.DeltaDay;
-                    wsFail.Cell(row, 8).Value = cell.GroupSize;
-                    wsFail.Cell(row, 9).Value = cell.VoltageLimit;
-                    wsFail.Cell(row, 10).Value = cell.IRLimit;
-                    wsFail.Cell(row, 11).Value = cell.DayLimit;
+                    col = 1;
+                    wsFail.Cell(row, col++).Value = cell.ID;
+                    wsFail.Cell(row, col++).Value = cell.Resistance;
+                    wsFail.Cell(row, col++).Value = cell.Voltage;
+
+                    if (mode == "EVE")
+                        wsFail.Cell(row, col++).Value = cell.Capacity;
+
+                    wsFail.Cell(row, col++).Value = cell.Date;
+                    wsFail.Cell(row, col++).Value = cell.RejectReason;
+                    wsFail.Cell(row, col++).Value = cell.DeltaV;
+                    wsFail.Cell(row, col++).Value = cell.DeltaDay;
+
+                    if (mode == "EVE")
+                        wsFail.Cell(row, col++).Value = cell.DeltaCapacity;
+
+                    wsFail.Cell(row, col++).Value = cell.GroupSize;
+                    wsFail.Cell(row, col++).Value = cell.VoltageLimit;
+                    wsFail.Cell(row, col++).Value = cell.IRLimit;
+                    wsFail.Cell(row, col++).Value = cell.DayLimit;
+
+                    if (mode == "EVE")
+                        wsFail.Cell(row, col++).Value = cell.CapacityLimit;
+
                     row++;
                 }
                 wsFail.Columns().AdjustToContents();
 
+                // ======= 新增索引頁面 =======
+                var wsIndex = workbook.Worksheets.Add("ID_to_Pack");
+
+                // 設定標題
+                wsIndex.Cell(1, 1).Value = "ID";
+                wsIndex.Cell(1, 2).Value = "to Pack";
+
+                // 假設給使用者 50 個輸入欄位
+                int maxRows = 50;
+
+                for (int rowIndex = 2; rowIndex <= maxRows + 1; rowIndex++)
+                {
+                    // 第一欄留空給使用者輸入 ID
+                    wsIndex.Cell(rowIndex, 1).Value = "";
+
+                    // 第二欄公式查 Success 工作表 ID (B列) 對應 Pack (A列)
+                    wsIndex.Cell(rowIndex, 2).FormulaA1 =
+                         $"=IFERROR(INDEX(Success!A:A, MATCH({wsIndex.Cell(rowIndex, 1).Address}, Success!B:B, 0)), \"N/A\")";
+                }
+
+                wsIndex.Columns().AdjustToContents();
+
+
                 workbook.SaveAs(path);
             }
         }
-
 
         private void UpdateProgress(int percent, string message)
         {
@@ -315,83 +449,142 @@ namespace CellSorting
             }
         }
 
-        private List<List<BatteryCell>> GroupCells(List<BatteryCell> cells, int groupSize, double vLimit, double rLimit, int dLimit)
+        private List<List<BatteryCell>> GroupCells(
+    List<BatteryCell> cells,
+    int groupSize,
+    double vLimit,
+    double rLimit,
+    int dLimit)
         {
-            var result = new List<List<BatteryCell>>();
-            var ungrouped = new List<BatteryCell>(cells);
-            int packIndex = 1;
+            // 先依 Resistance → Voltage → Date 排序，確保分組順序一致
+            var sorted = cells.OrderBy(c => c.Resistance)
+                              .ThenBy(c => c.Voltage)
+                              .ThenBy(c => c.Date)
+                              .ToList();
+
+            var result = new List<List<BatteryCell>>(); // 存放最終分組結果
+            var ungrouped = new List<BatteryCell>(sorted); // 尚未分組的電芯列表
+            int packIndex = 1; // 分組編號
+            int maxRetry = 3; // 每顆電芯最多重試次數
+
+            // 初始化每顆重試次數
+            var retryCount = ungrouped.ToDictionary(c => c.ID, c => 0);
 
             while (ungrouped.Count > 0)
             {
-                var currentGroup = new List<BatteryCell>();
-                currentGroup.Add(ungrouped[0]);
-                ungrouped.RemoveAt(0);
+                var group = new List<BatteryCell>();
 
-                for (int i = ungrouped.Count - 1; i >= 0; i--)
+                while (group.Count < groupSize && ungrouped.Count > 0)
                 {
-                    var c = ungrouped[i];
+                    var cell = ungrouped[0];
+                    ungrouped.RemoveAt(0);
 
-                    double avgVoltage = currentGroup.Average(x => x.Voltage);
-                    DateTime firstDate = currentGroup[0].Date;
-                    double avgDaysOffset = currentGroup.Average(d => (d.Date - firstDate).TotalDays);
-                    DateTime avgDate = firstDate.AddDays(avgDaysOffset);
-
-                    double vDiff = Math.Abs(c.Voltage - avgVoltage);
-                    int dDiff = Math.Abs((c.Date - avgDate).Days);
-
-                    List<string> reasons = new List<string>();
-                    if (vDiff > vLimit) reasons.Add($"電壓差 {vDiff:F4} > {vLimit:F4}");
-                    if (c.Resistance > rLimit) reasons.Add($"內阻 {c.Resistance:F4} > {rLimit:F4}");
-                    if (dDiff > dLimit) reasons.Add($"日期差 {dDiff} 天 > {dLimit} 天");
-
-                    if (reasons.Count == 0)
+                    // ⚠ 內阻超標 → 直接 reject
+                    if (chkCheckIR.Checked && cell.Resistance * 1000 > rLimit)
                     {
-                        currentGroup.Add(c);
-                        ungrouped.RemoveAt(i);
-                        if (currentGroup.Count == groupSize)
-                            break;
+                        cell.RejectReason = $"內阻超標：{(cell.Resistance * 1000):F4} mΩ > 上限 {rLimit:F4} mΩ";
+                        cell.DeltaV = 0;
+                        cell.DeltaDay = 0;
+                        cell.GroupSize = groupSize;
+                        cell.VoltageLimit = vLimit;
+                        cell.IRLimit = rLimit;
+                        cell.DayLimit = dLimit;
+                        continue;
                     }
-                    else
+
+                    group.Add(cell);
+
+                    // 檢查 ΔV 與 ΔDay
+                    bool removed;
+                    do
                     {
-                        c.RejectReason = string.Join("; ", reasons);
-                    }
+                        removed = false;
+
+                        double deltaV = group.Count > 0 ? (group.Max(x => x.Voltage) - group.Min(x => x.Voltage)) * 1000 : 0;
+                        int deltaDay = group.Count > 0 ? (group.Max(x => x.Date) - group.Min(x => x.Date)).Days : 0;
+
+                        // ΔV 超限 → 踢出最離群
+                        if (chkCheckVdelta.Checked && deltaV > vLimit)
+                        {
+                            var avgV = group.Average(x => x.Voltage);
+                            var outlier = group.OrderByDescending(x => Math.Abs(x.Voltage - avgV)).First();
+                            outlier.RejectReason = $"踢出原因：ΔV={deltaV:F1} mV 超過上限 {vLimit:F1} mV";
+                            outlier.DeltaV = deltaV;
+                            outlier.DeltaDay = deltaDay;
+                            group.Remove(outlier);
+                            removed = true;
+
+                            retryCount[outlier.ID]++;
+                            if (retryCount[outlier.ID] <= maxRetry)
+                                ungrouped.Add(outlier);
+                        }
+
+                        // ΔDay 超限 → 踢出最離群
+                        if (!removed && chkCheckDdelta.Checked && deltaDay > dLimit)
+                        {
+                            DateTime minDate = group.Min(x => x.Date);
+                            DateTime maxDate = group.Max(x => x.Date);
+                            var outlier = group.OrderByDescending(x =>
+                            {
+                                var diffToMin = Math.Abs((x.Date - minDate).Ticks);
+                                var diffToMax = Math.Abs((x.Date - maxDate).Ticks);
+                                return Math.Max(diffToMin, diffToMax);
+                            }).First();
+
+                            outlier.RejectReason = $"踢出原因：ΔDay={deltaDay} 天 超過上限 {dLimit} 天";
+                            outlier.DeltaV = deltaV;
+                            outlier.DeltaDay = deltaDay;
+                            group.Remove(outlier);
+                            removed = true;
+
+                            retryCount[outlier.ID]++;
+                            if (retryCount[outlier.ID] <= maxRetry)
+                                ungrouped.Add(outlier);
+                        }
+
+                    } while (removed);
                 }
 
-                if (currentGroup.Count == groupSize)
+                // 成功分組
+                if (group.Count == groupSize)
                 {
-                    double minV = currentGroup.Min(x => x.Voltage);
-                    double maxV = currentGroup.Max(x => x.Voltage);
-                    DateTime minDate = currentGroup.Min(x => x.Date);
-                    DateTime maxDate = currentGroup.Max(x => x.Date);
+                    double deltaV = group.Count > 0 ? (group.Max(x => x.Voltage) - group.Min(x => x.Voltage)) * 1000 : 0;
+                    DateTime minDate = group.Min(x => x.Date);
+                    DateTime maxDate = group.Max(x => x.Date);
+                    int deltaDay = (maxDate - minDate).Days;
 
-                    foreach (var cc in currentGroup)
+                    foreach (var cell in group)
                     {
-                        cc.Pack = packIndex;
-                        cc.DeltaV = maxV - minV;
-                        cc.DeltaDay = (maxDate - minDate).Days;
-                        cc.GroupSize = groupSize;
-                        cc.VoltageLimit = vLimit;
-                        cc.IRLimit = rLimit;
-                        cc.DayLimit = dLimit;
+                        cell.Pack = packIndex;
+                        cell.DeltaV = deltaV;
+                        cell.DeltaDay = deltaDay;
+                        cell.GroupSize = groupSize;
+                        cell.VoltageLimit = vLimit;
+                        cell.IRLimit = rLimit;
+                        cell.DayLimit = dLimit;
                     }
 
-                    result.Add(new List<BatteryCell>(currentGroup));
+                    result.Add(group);
                     packIndex++;
                 }
                 else
                 {
-                    foreach (var cc in currentGroup)
-                    {
-                        if (string.IsNullOrEmpty(cc.RejectReason))
-                            cc.RejectReason = $"尾端不足組：僅有 {currentGroup.Count} 顆，不滿 {groupSize} 顆";
+                    // 尾端不足組 → 標記 Reject
+                    double deltaV = group.Count > 0 ? (group.Max(x => x.Voltage) - group.Min(x => x.Voltage)) * 1000 : 0;
+                    DateTime minDate = group.Count > 0 ? group.Min(x => x.Date) : DateTime.Today;
+                    DateTime maxDate = group.Count > 0 ? group.Max(x => x.Date) : DateTime.Today;
+                    int deltaDay = (maxDate - minDate).Days;
 
-                        // 即使不滿組，也把完整欄位記錄
-                        cc.DeltaV = 0;
-                        cc.DeltaDay = 0;
-                        cc.GroupSize = currentGroup.Count;
-                        cc.VoltageLimit = vLimit;
-                        cc.IRLimit = rLimit;
-                        cc.DayLimit = dLimit;
+                    foreach (var cell in group)
+                    {
+                        cell.Pack = null;
+                        cell.RejectReason = $"尾端不足組：僅 {group.Count} 顆，不滿 {groupSize} 顆";
+                        cell.DeltaV = deltaV;
+                        cell.DeltaDay = deltaDay;
+                        cell.GroupSize = groupSize;
+                        cell.VoltageLimit = vLimit;
+                        cell.IRLimit = rLimit;
+                        cell.DayLimit = dLimit;
                     }
                 }
             }
@@ -400,7 +593,224 @@ namespace CellSorting
         }
 
 
-        private List<BatteryCell> ImportFromExcel(string filePath)
+        private List<List<BatteryCell>> GroupCellsEVE(
+            List<BatteryCell> cells,
+            int groupSize,
+            double vLimit,   // ΔV 限制 (mV)
+            double rLimit,   // 內阻上限 (mΩ)
+            double dLimit,   // ΔDay 限制 (天)
+            double cLimit    // ΔC 限制 (mAh)
+        )
+        {
+            var result = new List<List<BatteryCell>>();
+
+            // 依 ID 前綴分群 (例如 H9250)
+            var groupedByPrefix = cells
+                .GroupBy(c => GetIdPrefix(c.ID))
+                .OrderBy(g => g.Key);
+
+            int packIndex = 1;
+            int maxRetry = 3; // 每顆電芯最多重試分組次數
+
+            foreach (var prefixGroup in groupedByPrefix)
+            {
+                // 先 IR → Voltage → Capacity 排序
+                var sorted = prefixGroup.OrderBy(c => c.Resistance)
+                                        .ThenBy(c => c.Voltage)
+                                        .ThenByDescending(c => c.Capacity)
+                                        .ToList();
+
+                var ungrouped = new List<BatteryCell>(sorted);
+
+                // 初始化每顆重試次數
+                var retryCount = ungrouped.ToDictionary(c => c.ID, c => 0);
+
+                while (ungrouped.Count > 0)
+                {
+                    var group = new List<BatteryCell>();
+
+                    while (group.Count < groupSize && ungrouped.Count > 0)
+                    {
+                        var cell = ungrouped[0];
+                        ungrouped.RemoveAt(0);
+
+                        // 內阻超標 → 直接 reject
+                        if (chkCheckIR.Checked && cell.Resistance * 1000 > rLimit)
+                        {
+                            cell.RejectReason = $"內阻超標：{(cell.Resistance * 1000):F2} mΩ > 上限 {rLimit:F2} mΩ";
+                            cell.Pack = null;
+                            cell.DeltaV = 0;
+                            cell.DeltaCapacity = 0;
+                            cell.DeltaDay = 0;
+                            continue;
+                        }
+
+                        group.Add(cell);
+
+                        // 檢查 ΔV, ΔC, ΔDay
+                        bool removed;
+                        do
+                        {
+                            removed = false;
+
+                            double deltaV = group.Count > 0 ? (group.Max(x => x.Voltage) - group.Min(x => x.Voltage)) * 1000 : 0;
+                            double deltaC = group.Count > 0 ? (group.Max(x => x.Capacity) - group.Min(x => x.Capacity)) : 0;
+                            int deltaDay = group.Count > 0 ? (group.Max(x => x.Date) - group.Min(x => x.Date)).Days : 0;
+
+                            // ΔV
+                            if (chkCheckVdelta.Checked && deltaV > vLimit)
+                            {
+                                var avgV = group.Average(x => x.Voltage);
+                                var outlier = group.OrderByDescending(x => Math.Abs(x.Voltage - avgV)).First();
+                                outlier.RejectReason = $"踢出原因：ΔV={deltaV:F1} mV 超過上限 {vLimit:F1} mV";
+                                outlier.DeltaV = deltaV;
+                                outlier.DeltaCapacity = deltaC;
+                                outlier.DeltaDay = deltaDay;
+                                group.Remove(outlier);
+                                removed = true;
+
+                                // 增加重試次數，未超過 maxRetry 回到 ungrouped
+                                retryCount[outlier.ID]++;
+                                if (retryCount[outlier.ID] <= maxRetry)
+                                    ungrouped.Add(outlier);
+                            }
+
+                            // ΔC
+                            if (chkCheckCapacity.Checked && !removed && deltaC > cLimit)
+                            {
+                                var avgC = group.Average(x => x.Capacity);
+                                var outlier = group.OrderByDescending(x => Math.Abs(x.Capacity - avgC)).First();
+                                outlier.RejectReason = $"踢出原因：ΔC={deltaC:F0} mAh 超過上限 {cLimit:F0} mAh";
+                                outlier.DeltaV = deltaV;
+                                outlier.DeltaCapacity = deltaC;
+                                outlier.DeltaDay = deltaDay;
+                                group.Remove(outlier);
+                                removed = true;
+
+                                retryCount[outlier.ID]++;
+                                if (retryCount[outlier.ID] <= maxRetry)
+                                    ungrouped.Add(outlier);
+                            }
+
+                            // ΔDay
+                            if (chkCheckDdelta.Checked && !removed && deltaDay > dLimit)
+                            {
+                                DateTime minDate = group.Min(x => x.Date);
+                                DateTime maxDate = group.Max(x => x.Date);
+                                var outlier = group.OrderByDescending(x =>
+                                {
+                                    var diffToMin = Math.Abs((x.Date - minDate).Ticks);
+                                    var diffToMax = Math.Abs((x.Date - maxDate).Ticks);
+                                    return Math.Max(diffToMin, diffToMax);
+                                }).First();
+
+                                outlier.RejectReason = $"踢出原因：ΔDay={deltaDay} 天 超過上限 {dLimit} 天";
+                                outlier.DeltaV = deltaV;
+                                outlier.DeltaCapacity = deltaC;
+                                outlier.DeltaDay = deltaDay;
+                                group.Remove(outlier);
+                                removed = true;
+
+                                retryCount[outlier.ID]++;
+                                if (retryCount[outlier.ID] <= maxRetry)
+                                    ungrouped.Add(outlier);
+                            }
+
+                        } while (removed);
+                    }
+
+                    // 成功分組
+                    if (group.Count == groupSize)
+                    {
+                        double deltaV = group.Count > 0 ? (group.Max(x => x.Voltage) - group.Min(x => x.Voltage)) * 1000 : 0;
+                        double deltaC = group.Count > 0 ? (group.Max(x => x.Capacity) - group.Min(x => x.Capacity)) : 0;
+                        int deltaDay = group.Count > 0 ? (group.Max(x => x.Date) - group.Min(x => x.Date)).Days : 0;
+
+                        foreach (var cell in group)
+                        {
+                            cell.Pack = packIndex;
+                            cell.DeltaV = deltaV;
+                            cell.DeltaCapacity = deltaC;
+                            cell.DeltaDay = deltaDay;
+                            cell.GroupSize = groupSize;
+                            cell.VoltageLimit = vLimit;
+                            cell.IRLimit = rLimit;
+                            cell.CapacityLimit = cLimit;
+                            cell.DayLimit = (int)Math.Round(dLimit, 0);
+                        }
+
+                        result.Add(group);
+                        packIndex++;
+                    }
+                    else
+                    {
+                        // 尾端不足組 → 設定 Reject
+                        double deltaV = group.Count > 0 ? (group.Max(x => x.Voltage) - group.Min(x => x.Voltage)) * 1000 : 0;
+                        double deltaC = group.Count > 0 ? (group.Max(x => x.Capacity) - group.Min(x => x.Capacity)) : 0;
+                        int deltaDay = group.Count > 0 ? (group.Max(x => x.Date) - group.Min(x => x.Date)).Days : 0;
+
+                        foreach (var cell in group)
+                        {
+                            cell.Pack = null;
+                            cell.RejectReason = $"尾端不足組：僅 {group.Count} 顆，不滿 {groupSize} 顆";
+                            cell.DeltaV = deltaV;
+                            cell.DeltaCapacity = deltaC;
+                            cell.DeltaDay = deltaDay;
+                            cell.GroupSize = groupSize;
+                            cell.VoltageLimit = vLimit;
+                            cell.IRLimit = rLimit;
+                            cell.CapacityLimit = cLimit;
+                            cell.DayLimit = (int)Math.Round(dLimit, 0);
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+
+
+
+
+        /// <summary>
+        /// 取得電芯ID前綴（例如 "H9250E1GP1107270" → "H9250"）
+        /// </summary>
+        private string GetIdPrefix(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return "UNKNOWN";
+
+            // 前綴取連續字母（直到數字出現）
+            var prefix = new string(id.TakeWhile(char.IsLetter).ToArray());
+
+            if (string.IsNullOrWhiteSpace(prefix))
+                prefix = id.Length >= 5 ? id.Substring(0, 5) : id;
+
+            return prefix;
+        }
+
+
+        private double SafeGetDouble(IXLCell cell)
+        {
+            if (cell == null || cell.IsEmpty())
+                return 0; // 空白直接給 0
+
+            try
+            {
+                return cell.GetDouble();
+            }
+            catch
+            {
+                // 如果 GetDouble 失敗，改用字串解析
+                var s = cell.GetString().Trim();
+                if (double.TryParse(s, out double val))
+                    return val;
+                return 0; // 都失敗就給 0
+            }
+        }
+
+        private List<BatteryCell> ImportFromExcel(string filePath, string mode)
         {
             var list = new List<BatteryCell>();
             var idDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -410,14 +820,14 @@ namespace CellSorting
                 var ws = workbook.Worksheets.First();
                 int row = 1;
 
-                while (!ws.Cell(row, 2).IsEmpty()) // 第二列判斷空白
+                while (!ws.Cell(row, 1).IsEmpty())
                 {
                     string id = ws.Cell(row, 1).GetString().Trim().ToUpper();
-                    double volt = ws.Cell(row, 2).GetDouble();
-                    double res = ws.Cell(row, 3).GetDouble();//* 1000;
+                    double res = SafeGetDouble(ws.Cell(row, 2));
+                    double volt = SafeGetDouble(ws.Cell(row, 3));
+                    double capacity = SafeGetDouble(ws.Cell(row, 4));
 
-                    // fakeMode 下不要解析 ID
-                    DateTime date = fakeMode ? DateTime.Today : ParseDateFromId(id);
+                    DateTime date = fakeMode ? DateTime.Today : ParseDateFromId(id, mode);
 
                     // 檢查重複
                     if (!string.IsNullOrWhiteSpace(id) && idDict.ContainsKey(id))
@@ -431,8 +841,9 @@ namespace CellSorting
                     list.Add(new BatteryCell
                     {
                         ID = id,
-                        Voltage = volt,
                         Resistance = res,
+                        Voltage = volt,
+                        Capacity = capacity,
                         Date = date
                     });
 
@@ -445,6 +856,7 @@ namespace CellSorting
 
             return list;
         }
+
 
         private void btnImport_MouseEnter(object sender, EventArgs e)
         {
@@ -465,6 +877,92 @@ namespace CellSorting
                 btn.BackColor = SystemColors.Control; // 恢復預設背景
                 btn.ForeColor = SystemColors.ControlText; // 恢復文字顏色
                 btn.Font = new Font(btn.Font, FontStyle.Regular); // 恢復普通字體
+            }
+        }
+
+        private void chkCheckVdelta_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkCheckVdelta.Checked)
+            {
+                txtVdelta.BackColor = Color.WhiteSmoke;
+                txtVdelta.Enabled = true;
+            }
+            else
+            {
+                txtVdelta.Text = "";
+                txtVdelta.BackColor = Color.LightGray;
+                txtVdelta.Enabled = false;
+            }
+        }
+
+        private void chkCheckDdelta_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkCheckDdelta.Checked)
+            {
+                txtDDelta.BackColor = Color.WhiteSmoke;
+                txtDDelta.Enabled = true;
+            }
+            else
+            {
+                txtDDelta.Text = "";
+                txtDDelta.BackColor = Color.LightGray;
+                txtDDelta.Enabled = false;
+            }
+        }
+
+        private void chkCheckIR_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkCheckIR.Checked)
+            {
+                txtIR.BackColor = Color.WhiteSmoke;
+                txtIR.Enabled = true;
+            }
+            else
+            {
+                txtIR.Text = "";
+                txtIR.BackColor = Color.LightGray;
+                txtIR.Enabled = false; 
+            }
+        }
+
+        private void chkCheckCapacity_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkCheckCapacity.Checked)
+            {
+                txtCapacityDelta.BackColor = Color.WhiteSmoke;
+                txtCapacityDelta.Enabled = true;
+            }
+            else
+            {
+                txtCapacityDelta.Text = "";
+                txtCapacityDelta.BackColor = Color.LightGray;
+                txtCapacityDelta.Enabled = false;
+            }
+        }
+
+        private void cbboxSwithMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cbboxSwithMode.SelectedItem == null)
+                return;
+
+            string mode = cbboxSwithMode.SelectedItem.ToString();
+
+            if (mode == "Gus")
+            {
+                // Gus 模式 → 鎖住容量欄位
+                txtCapacityDelta.Enabled = false;
+                txtCapacityDelta.BackColor = Color.LightGray;
+                txtCapacityDelta.Text = "";
+                chkCheckCapacity.Checked = false;
+                chkCheckCapacity.Enabled = false;
+            }
+            else if (mode == "EVE")
+            {
+                // EVE 模式 → 開啟容量欄位
+                txtCapacityDelta.Enabled = true;
+                txtCapacityDelta.BackColor = Color.WhiteSmoke;
+                chkCheckCapacity.Checked = true;
+                chkCheckCapacity.Enabled = true;
             }
         }
     }

@@ -21,6 +21,7 @@ namespace CellSorting
 
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.btnImport = new System.Windows.Forms.Button();
             this.txtCellNum = new System.Windows.Forms.TextBox();
@@ -42,6 +43,8 @@ namespace CellSorting
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
             this.lblStatus = new System.Windows.Forms.Label();
             this.cbboxSwithMode = new System.Windows.Forms.ComboBox();
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.lstLog = new System.Windows.Forms.ListBox();
             this.groupBoxParams.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -52,7 +55,7 @@ namespace CellSorting
             this.btnImport.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnImport.Font = new System.Drawing.Font("微軟正黑體", 22F, System.Drawing.FontStyle.Bold);
             this.btnImport.ForeColor = System.Drawing.Color.White;
-            this.btnImport.Location = new System.Drawing.Point(240, 479);
+            this.btnImport.Location = new System.Drawing.Point(30, 479);
             this.btnImport.Name = "btnImport";
             this.btnImport.Size = new System.Drawing.Size(250, 60);
             this.btnImport.TabIndex = 4;
@@ -280,9 +283,26 @@ namespace CellSorting
             this.cbboxSwithMode.TabIndex = 5;
             this.cbboxSwithMode.SelectedIndexChanged += new System.EventHandler(this.cbboxSwithMode_SelectedIndexChanged);
             // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(61, 4);
+            // 
+            // lstLog
+            // 
+            this.lstLog.Font = new System.Drawing.Font("微軟正黑體", 12F);
+            this.lstLog.FormattingEnabled = true;
+            this.lstLog.ItemHeight = 25;
+            this.lstLog.Location = new System.Drawing.Point(286, 435);
+            this.lstLog.Name = "lstLog";
+            this.lstLog.Size = new System.Drawing.Size(431, 104);
+            this.lstLog.TabIndex = 14;
+            // 
             // Form1
             // 
             this.ClientSize = new System.Drawing.Size(750, 562);
+            this.Controls.Add(this.lstLog);
             this.Controls.Add(this.cbboxSwithMode);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.groupBoxParams);
@@ -322,5 +342,7 @@ namespace CellSorting
         private ProgressBar progressBar1;
         private Label lblStatus;
         private ComboBox cbboxSwithMode;
+        private ContextMenuStrip contextMenuStrip1;
+        private ListBox lstLog;
     }
 }

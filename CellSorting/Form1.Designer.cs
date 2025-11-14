@@ -45,6 +45,7 @@ namespace CellSorting
             this.cbboxSwithMode = new System.Windows.Forms.ComboBox();
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.lstLog = new System.Windows.Forms.ListBox();
+            this.btnHistory = new System.Windows.Forms.Button();
             this.groupBoxParams.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -299,9 +300,25 @@ namespace CellSorting
             this.lstLog.Size = new System.Drawing.Size(431, 104);
             this.lstLog.TabIndex = 14;
             // 
+            // btnHistory
+            // 
+            this.btnHistory.BackColor = System.Drawing.Color.DodgerBlue;
+            this.btnHistory.FlatAppearance.BorderSize = 0;
+            this.btnHistory.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnHistory.Font = new System.Drawing.Font("微軟正黑體", 17F, System.Drawing.FontStyle.Bold);
+            this.btnHistory.ForeColor = System.Drawing.Color.White;
+            this.btnHistory.Location = new System.Drawing.Point(536, 20);
+            this.btnHistory.Name = "btnHistory";
+            this.btnHistory.Size = new System.Drawing.Size(179, 54);
+            this.btnHistory.TabIndex = 15;
+            this.btnHistory.Text = "查詢歷史數據";
+            this.btnHistory.UseVisualStyleBackColor = false;
+            this.btnHistory.Click += new System.EventHandler(this.btnHistory_Click);
+            // 
             // Form1
             // 
-            this.ClientSize = new System.Drawing.Size(750, 562);
+            this.ClientSize = new System.Drawing.Size(740, 562);
+            this.Controls.Add(this.btnHistory);
             this.Controls.Add(this.lstLog);
             this.Controls.Add(this.cbboxSwithMode);
             this.Controls.Add(this.label1);
@@ -344,5 +361,6 @@ namespace CellSorting
         private ComboBox cbboxSwithMode;
         private ContextMenuStrip contextMenuStrip1;
         private ListBox lstLog;
+        private Button btnHistory;
     }
 }

@@ -3,13 +3,6 @@
   "WorkspaceRootPath": "C:\\Users\\G11407007\\Desktop\\CellSorting\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|c:\\users\\g11407007\\desktop\\cellsorting\\cellsorting\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{00000000-0000-0000-0000-000000000000}|\u003CSolution\u003E|CellSorting||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|C:\\Users\\G11407007\\Desktop\\CellSorting\\cellsorting\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
     },
@@ -18,7 +11,20 @@
       "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form1.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|c:\\users\\g11407007\\desktop\\cellsorting\\cellsorting\\||{B270807C-D8C6-49EB-8EBE-8E8D566637A1}|5e9a8ac2-4f34-4521-858f-4c248ba31532"
+      "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|c:\\users\\g11407007\\desktop\\cellsorting\\cellsorting\\form2dbshow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form2dbshow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|c:\\users\\g11407007\\desktop\\cellsorting\\cellsorting\\form2dbshow.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form2dbshow.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|c:\\users\\g11407007\\desktop\\cellsorting\\cellsorting\\form2dbshow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form2dbshow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|c:\\users\\g11407007\\desktop\\cellsorting\\cellsorting\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{389CACEA-6E95-4DE9-9FB8-F9EC22B6D262}|CellSorting\\CellSorting.csproj|solutionrelative:cellsorting\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -28,7 +34,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 512,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Bookmark",
@@ -36,13 +42,51 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
+              "Title": "Form2dbshow.cs",
+              "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form2dbshow.cs",
+              "RelativeDocumentMoniker": "CellSorting\\Form2dbshow.cs",
+              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form2dbshow.cs",
+              "RelativeToolTip": "CellSorting\\Form2dbshow.cs",
+              "ViewState": "AgIAACwAAAAAAAAAAAAswDUAAAAzAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-10T03:41:49.869Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Form2dbshow.Designer.cs",
+              "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form2dbshow.Designer.cs",
+              "RelativeDocumentMoniker": "CellSorting\\Form2dbshow.Designer.cs",
+              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form2dbshow.Designer.cs",
+              "RelativeToolTip": "CellSorting\\Form2dbshow.Designer.cs",
+              "ViewState": "AgIAAOgAAAAAAAAAAAAcwPYAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-10T03:41:01.641Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Form2dbshow.cs [\u8A2D\u8A08]",
+              "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form2dbshow.cs",
+              "RelativeDocumentMoniker": "CellSorting\\Form2dbshow.cs",
+              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form2dbshow.cs [\u8A2D\u8A08]",
+              "RelativeToolTip": "CellSorting\\Form2dbshow.cs [\u8A2D\u8A08]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-10T03:40:47.658Z",
+              "EditorCaption": " [\u8A2D\u8A08]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
               "Title": "Form1.cs",
               "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.cs",
               "RelativeDocumentMoniker": "CellSorting\\Form1.cs",
-              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.cs",
-              "RelativeToolTip": "CellSorting\\Form1.cs",
-              "ViewState": "AgIAAGgCAAAAAAAAAAAAwJwCAAApAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.cs*",
+              "RelativeToolTip": "CellSorting\\Form1.cs*",
+              "ViewState": "AgIAAMwDAAAAAAAAAAAcwCgEAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-31T06:55:29.349Z",
               "EditorCaption": ""
@@ -50,36 +94,24 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "CellSorting",
-              "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\CellSorting.csproj",
-              "RelativeDocumentMoniker": "CellSorting\\CellSorting.csproj",
-              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\CellSorting.csproj",
-              "RelativeToolTip": "CellSorting\\CellSorting.csproj",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
-              "WhenOpened": "2025-10-31T09:35:32.606Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
               "Title": "Form1.Designer.cs",
               "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.Designer.cs",
               "RelativeDocumentMoniker": "CellSorting\\Form1.Designer.cs",
-              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.Designer.cs",
-              "RelativeToolTip": "CellSorting\\Form1.Designer.cs",
-              "ViewState": "AgIAAB8BAAAAAAAAAAAAwCwBAAAAAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.Designer.cs*",
+              "RelativeToolTip": "CellSorting\\Form1.Designer.cs*",
+              "ViewState": "AgIAACIBAAAAAAAAAAAcwC8BAAAPAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-31T07:09:50.716Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "Form1.cs [\u8A2D\u8A08]",
               "DocumentMoniker": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.cs",
               "RelativeDocumentMoniker": "CellSorting\\Form1.cs",
-              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.cs [\u8A2D\u8A08]",
-              "RelativeToolTip": "CellSorting\\Form1.cs [\u8A2D\u8A08]",
+              "ToolTip": "C:\\Users\\G11407007\\Desktop\\CellSorting\\CellSorting\\Form1.cs [\u8A2D\u8A08]*",
+              "RelativeToolTip": "CellSorting\\Form1.cs [\u8A2D\u8A08]*",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-31T06:54:28.831Z",
               "EditorCaption": " [\u8A2D\u8A08]"

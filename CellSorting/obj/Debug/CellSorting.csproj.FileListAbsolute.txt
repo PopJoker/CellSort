@@ -35,3 +35,6 @@ C:\Users\G11407007\Desktop\CellSorting\CellSorting\bin\Debug\System.Memory.xml
 C:\Users\G11407007\Desktop\CellSorting\CellSorting\bin\Debug\System.Numerics.Vectors.xml
 C:\Users\G11407007\Desktop\CellSorting\CellSorting\bin\Debug\System.Runtime.CompilerServices.Unsafe.xml
 C:\Users\G11407007\Desktop\CellSorting\CellSorting\obj\Debug\CellSort.E0438D73.Up2Date
+C:\Users\G11407007\Desktop\CellSorting\CellSorting\bin\Debug\System.Data.SQLite.dll
+C:\Users\G11407007\Desktop\CellSorting\CellSorting\bin\Debug\System.Data.SQLite.xml
+C:\Users\G11407007\Desktop\CellSorting\CellSorting\obj\Debug\CellSorting.Form2dbshow.resources

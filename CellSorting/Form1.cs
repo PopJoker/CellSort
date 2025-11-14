@@ -7,7 +7,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Data.SQLite;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -301,160 +303,266 @@ namespace CellSorting
 
         private void ExportToExcelToPath(List<List<BatteryCell>> groups, List<BatteryCell> allCells, string path, string mode)
         {
-            using (var workbook = new XLWorkbook())
+            try
             {
-                var wsSuccess = workbook.Worksheets.Add("Success");
-                var wsFail = workbook.Worksheets.Add("Rejects");
-
-                int col = 1;
-
-                // ======= 設定標題 =======
-                wsSuccess.Cell(1, col++).Value = "Pack";
-                wsSuccess.Cell(1, col++).Value = "ID";
-                wsSuccess.Cell(1, col++).Value = "Resistance(Ω)";
-                wsSuccess.Cell(1, col++).Value = "Voltage(V)";
-
-                if (mode == "EVE")
+                using (var workbook = new XLWorkbook())
                 {
-                    wsSuccess.Cell(1, col++).Value = "Capacity";
-                }
+                    var wsSuccess = workbook.Worksheets.Add("Success");
+                    var wsFail = workbook.Worksheets.Add("Rejects");
 
-                wsSuccess.Cell(1, col++).Value = "Date";
-                wsSuccess.Cell(1, col++).Value = "DeltaV(mV)";
-                wsSuccess.Cell(1, col++).Value = "DeltaDay";
+                    // ===== 建立 SQLite DB =====
+                    string appDataPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BatteryGrouping");
+                    Directory.CreateDirectory(appDataPath);
+                    string dbPath = System.IO.Path.Combine(appDataPath, "BatteryData.db");
 
-                if (mode == "EVE")
-                {
-                    wsSuccess.Cell(1, col++).Value = "DeltaCapacity";
-                }
-
-                wsSuccess.Cell(1, col++).Value = "GroupSize";
-                wsSuccess.Cell(1, col++).Value = "VoltageLimit(mV)";
-                wsSuccess.Cell(1, col++).Value = "IRLimit(mΩ)";
-                wsSuccess.Cell(1, col++).Value = "DayLimit";
-
-                if (mode == "EVE")
-                {
-                    wsSuccess.Cell(1, col++).Value = "CapacityLimit";
-                }
-
-                // ======= 填入成功分組 =======
-                int row = 2;
-                foreach (var group in groups)
-                {
-                    Console.WriteLine($"Group Pack {group[0].Pack}");
-                    foreach (var cell in group)
+                    try
                     {
-                        Console.WriteLine($"  Cell {cell.ID}, Pack={cell.Pack}");
+                        using (var conn = new SQLiteConnection($"Data Source={dbPath};Version=3;"))
+                        {
+                            conn.Open();
+
+                            // ===== 建表 =====
+                            string createSuccessTable = @"
+                        CREATE TABLE IF NOT EXISTS SuccessCells (
+                            ID TEXT,
+                            Pack INTEGER,
+                            Resistance REAL,
+                            Voltage REAL,
+                            Capacity REAL,
+                            Date TEXT,
+                            DeltaV REAL,
+                            DeltaDay REAL,
+                            DeltaCapacity REAL,
+                            GroupSize INTEGER,
+                            VoltageLimit REAL,
+                            IRLimit REAL,
+                            DayLimit INTEGER,
+                            CapacityLimit REAL,
+                            ExportTime TEXT
+                        )";
+
+                            string createRejectTable = @"
+                        CREATE TABLE IF NOT EXISTS RejectCells (
+                            ID TEXT,
+                            Resistance REAL,
+                            Voltage REAL,
+                            Capacity REAL,
+                            Date TEXT,
+                            Reason TEXT,
+                            DeltaV REAL,
+                            DeltaDay REAL,
+                            DeltaCapacity REAL,
+                            GroupSize INTEGER,
+                            VoltageLimit REAL,
+                            IRLimit REAL,
+                            DayLimit INTEGER,
+                            CapacityLimit REAL,
+                            ExportTime TEXT
+                        )";
+
+                            using (var cmd = new SQLiteCommand(createSuccessTable, conn)) cmd.ExecuteNonQuery();
+                            using (var cmd = new SQLiteCommand(createRejectTable, conn)) cmd.ExecuteNonQuery();
+
+                            string insertSuccess = @"
+                        INSERT INTO SuccessCells
+                        (ID, Pack, Resistance, Voltage, Capacity, Date, DeltaV, DeltaDay, DeltaCapacity, GroupSize,
+                        VoltageLimit, IRLimit, DayLimit, CapacityLimit, ExportTime)
+                        VALUES
+                        (@ID, @Pack, @Resistance, @Voltage, @Capacity, @Date, @DeltaV, @DeltaDay, @DeltaCapacity, @GroupSize,
+                        @VoltageLimit, @IRLimit, @DayLimit, @CapacityLimit, @ExportTime)";
+
+                            string insertReject = @"
+                        INSERT INTO RejectCells
+                        (ID, Resistance, Voltage, Capacity, Date, Reason, DeltaV, DeltaDay, DeltaCapacity, GroupSize,
+                        VoltageLimit, IRLimit, DayLimit, CapacityLimit, ExportTime)
+                        VALUES
+                        (@ID, @Resistance, @Voltage, @Capacity, @Date, @Reason, @DeltaV, @DeltaDay, @DeltaCapacity, @GroupSize,
+                        @VoltageLimit, @IRLimit, @DayLimit, @CapacityLimit, @ExportTime)";
+
+                            string exportTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+                            using (var trans = conn.BeginTransaction())
+                            {
+                                try
+                                {
+                                    // 寫入成功電芯
+                                    foreach (var group in groups)
+                                    {
+                                        foreach (var cell in group)
+                                        {
+                                            using (var cmd = new SQLiteCommand(insertSuccess, conn))
+                                            {
+                                                cmd.Parameters.AddWithValue("@ID", cell.ID);
+                                                cmd.Parameters.AddWithValue("@Pack", cell.Pack ?? 0);
+                                                cmd.Parameters.AddWithValue("@Resistance", cell.Resistance);
+                                                cmd.Parameters.AddWithValue("@Voltage", cell.Voltage);
+                                                cmd.Parameters.AddWithValue("@Capacity", mode == "EVE" ? cell.Capacity : 0);
+                                                cmd.Parameters.AddWithValue("@Date", cell.Date);
+                                                cmd.Parameters.AddWithValue("@DeltaV", cell.DeltaV);
+                                                cmd.Parameters.AddWithValue("@DeltaDay", cell.DeltaDay);
+                                                cmd.Parameters.AddWithValue("@DeltaCapacity", mode == "EVE" ? cell.DeltaCapacity : 0);
+                                                cmd.Parameters.AddWithValue("@GroupSize", cell.GroupSize);
+                                                cmd.Parameters.AddWithValue("@VoltageLimit", cell.VoltageLimit);
+                                                cmd.Parameters.AddWithValue("@IRLimit", cell.IRLimit);
+                                                cmd.Parameters.AddWithValue("@DayLimit", cell.DayLimit);
+                                                cmd.Parameters.AddWithValue("@CapacityLimit", mode == "EVE" ? cell.CapacityLimit : 0);
+                                                cmd.Parameters.AddWithValue("@ExportTime", exportTime);
+                                                cmd.ExecuteNonQuery();
+                                            }
+                                        }
+                                    }
+
+                                    // 寫入失敗電芯
+                                    foreach (var cell in allCells.Where(c => c.Pack == null))
+                                    {
+                                        using (var cmd = new SQLiteCommand(insertReject, conn))
+                                        {
+                                            cmd.Parameters.AddWithValue("@ID", cell.ID);
+                                            cmd.Parameters.AddWithValue("@Resistance", cell.Resistance);
+                                            cmd.Parameters.AddWithValue("@Voltage", cell.Voltage);
+                                            cmd.Parameters.AddWithValue("@Capacity", mode == "EVE" ? cell.Capacity : 0);
+                                            cmd.Parameters.AddWithValue("@Date", cell.Date);
+                                            cmd.Parameters.AddWithValue("@Reason", cell.RejectReason ?? "");
+                                            cmd.Parameters.AddWithValue("@DeltaV", cell.DeltaV);
+                                            cmd.Parameters.AddWithValue("@DeltaDay", cell.DeltaDay);
+                                            cmd.Parameters.AddWithValue("@DeltaCapacity", mode == "EVE" ? cell.DeltaCapacity : 0);
+                                            cmd.Parameters.AddWithValue("@GroupSize", cell.GroupSize);
+                                            cmd.Parameters.AddWithValue("@VoltageLimit", cell.VoltageLimit);
+                                            cmd.Parameters.AddWithValue("@IRLimit", cell.IRLimit);
+                                            cmd.Parameters.AddWithValue("@DayLimit", cell.DayLimit);
+                                            cmd.Parameters.AddWithValue("@CapacityLimit", mode == "EVE" ? cell.CapacityLimit : 0);
+                                            cmd.Parameters.AddWithValue("@ExportTime", exportTime);
+                                            cmd.ExecuteNonQuery();
+                                        }
+                                    }
+
+                                    trans.Commit();
+                                }
+                                catch (Exception exTrans)
+                                {
+                                    trans.Rollback();
+                                    MessageBox.Show("SQLite Transaction Error: " + exTrans.Message, "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                }
+                            }
+
+                            conn.Close();
+                        }
+                    }
+                    catch (Exception exDb)
+                    {
+                        MessageBox.Show("SQLite Error: " + exDb.Message, "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+
+                    // ===== Excel 匯出 =====
+                    try
+                    {
+                        // ===== 設定標題 =====
+                        int col = 1;
+                        wsSuccess.Cell(1, col++).Value = "Pack";
+                        wsSuccess.Cell(1, col++).Value = "ID";
+                        wsSuccess.Cell(1, col++).Value = "Resistance(Ω)";
+                        wsSuccess.Cell(1, col++).Value = "Voltage(V)";
+                        if (mode == "EVE") wsSuccess.Cell(1, col++).Value = "Capacity";
+                        wsSuccess.Cell(1, col++).Value = "Date";
+                        wsSuccess.Cell(1, col++).Value = "DeltaV(mV)";
+                        wsSuccess.Cell(1, col++).Value = "DeltaDay";
+                        if (mode == "EVE") wsSuccess.Cell(1, col++).Value = "DeltaCapacity";
+                        wsSuccess.Cell(1, col++).Value = "GroupSize";
+                        wsSuccess.Cell(1, col++).Value = "VoltageLimit(mV)";
+                        wsSuccess.Cell(1, col++).Value = "IRLimit(mΩ)";
+                        wsSuccess.Cell(1, col++).Value = "DayLimit";
+                        if (mode == "EVE") wsSuccess.Cell(1, col++).Value = "CapacityLimit";
+
+                        // ===== 填入成功分組 =====
+                        int row = 2;
+                        foreach (var group in groups)
+                        {
+                            foreach (var cell in group)
+                            {
+                                col = 1;
+                                wsSuccess.Cell(row, col++).Value = cell.Pack;
+                                wsSuccess.Cell(row, col++).Value = cell.ID;
+                                wsSuccess.Cell(row, col++).Value = cell.Resistance;
+                                wsSuccess.Cell(row, col++).Value = cell.Voltage;
+                                if (mode == "EVE") wsSuccess.Cell(row, col++).Value = cell.Capacity;
+                                wsSuccess.Cell(row, col++).Value = cell.Date;
+                                wsSuccess.Cell(row, col++).Value = cell.DeltaV;
+                                wsSuccess.Cell(row, col++).Value = cell.DeltaDay;
+                                if (mode == "EVE") wsSuccess.Cell(row, col++).Value = cell.DeltaCapacity;
+                                wsSuccess.Cell(row, col++).Value = cell.GroupSize;
+                                wsSuccess.Cell(row, col++).Value = cell.VoltageLimit;
+                                wsSuccess.Cell(row, col++).Value = cell.IRLimit;
+                                wsSuccess.Cell(row, col++).Value = cell.DayLimit;
+                                if (mode == "EVE") wsSuccess.Cell(row, col++).Value = cell.CapacityLimit;
+                                row++;
+                            }
+                        }
+                        wsSuccess.Columns().AdjustToContents();
+
+                        // ===== 填入失敗電芯 =====
                         col = 1;
-                        wsSuccess.Cell(row, col++).Value = cell.Pack;
-                        wsSuccess.Cell(row, col++).Value = cell.ID;
-                        wsSuccess.Cell(row, col++).Value = cell.Resistance;
-                        wsSuccess.Cell(row, col++).Value = cell.Voltage;
+                        wsFail.Cell(1, col++).Value = "ID";
+                        wsFail.Cell(1, col++).Value = "Resistance(Ω)";
+                        wsFail.Cell(1, col++).Value = "Voltage(V)";
+                        if (mode == "EVE") wsFail.Cell(1, col++).Value = "Capacity";
+                        wsFail.Cell(1, col++).Value = "Date";
+                        wsFail.Cell(1, col++).Value = "Reason";
+                        wsFail.Cell(1, col++).Value = "DeltaV(mV)";
+                        wsFail.Cell(1, col++).Value = "DeltaDay";
+                        if (mode == "EVE") wsFail.Cell(1, col++).Value = "DeltaCapacity";
+                        wsFail.Cell(1, col++).Value = "GroupSize";
+                        wsFail.Cell(1, col++).Value = "VoltageLimit(mV)";
+                        wsFail.Cell(1, col++).Value = "IRLimit(mΩ)";
+                        wsFail.Cell(1, col++).Value = "DayLimit";
+                        if (mode == "EVE") wsFail.Cell(1, col++).Value = "CapacityLimit";
 
-                        if (mode == "EVE")
-                            wsSuccess.Cell(row, col++).Value = cell.Capacity;
+                        row = 2;
+                        foreach (var cell in allCells.Where(c => c.Pack == null))
+                        {
+                            col = 1;
+                            wsFail.Cell(row, col++).Value = cell.ID;
+                            wsFail.Cell(row, col++).Value = cell.Resistance;
+                            wsFail.Cell(row, col++).Value = cell.Voltage;
+                            if (mode == "EVE") wsFail.Cell(row, col++).Value = cell.Capacity;
+                            wsFail.Cell(row, col++).Value = cell.Date;
+                            wsFail.Cell(row, col++).Value = cell.RejectReason;
+                            wsFail.Cell(row, col++).Value = cell.DeltaV;
+                            wsFail.Cell(row, col++).Value = cell.DeltaDay;
+                            if (mode == "EVE") wsFail.Cell(row, col++).Value = cell.DeltaCapacity;
+                            wsFail.Cell(row, col++).Value = cell.GroupSize;
+                            wsFail.Cell(row, col++).Value = cell.VoltageLimit;
+                            wsFail.Cell(row, col++).Value = cell.IRLimit;
+                            wsFail.Cell(row, col++).Value = cell.DayLimit;
+                            if (mode == "EVE") wsFail.Cell(row, col++).Value = cell.CapacityLimit;
+                            row++;
+                        }
+                        wsFail.Columns().AdjustToContents();
 
-                        wsSuccess.Cell(row, col++).Value = cell.Date;
-                        wsSuccess.Cell(row, col++).Value = cell.DeltaV;
-                        wsSuccess.Cell(row, col++).Value = cell.DeltaDay;
+                        // ===== 新增索引頁 =====
+                        var wsIndex = workbook.Worksheets.Add("ID_to_Pack");
+                        wsIndex.Cell(1, 1).Value = "ID";
+                        wsIndex.Cell(1, 2).Value = "to Pack";
+                        int maxRows = 50;
+                        for (int rowIndex = 2; rowIndex <= maxRows + 1; rowIndex++)
+                        {
+                            wsIndex.Cell(rowIndex, 1).Value = "";
+                            wsIndex.Cell(rowIndex, 2).FormulaA1 =
+                                $"=IFERROR(INDEX(Success!A:A, MATCH({wsIndex.Cell(rowIndex, 1).Address}, Success!B:B, 0)), \"N/A\")";
+                        }
+                        wsIndex.Columns().AdjustToContents();
 
-                        if (mode == "EVE")
-                            wsSuccess.Cell(row, col++).Value = cell.DeltaCapacity;
-
-                        wsSuccess.Cell(row, col++).Value = cell.GroupSize;
-                        wsSuccess.Cell(row, col++).Value = cell.VoltageLimit;
-                        wsSuccess.Cell(row, col++).Value = cell.IRLimit;
-                        wsSuccess.Cell(row, col++).Value = cell.DayLimit;
-
-                        if (mode == "EVE")
-                            wsSuccess.Cell(row, col++).Value = cell.CapacityLimit;
-
-                        row++;
+                        // 儲存 Excel
+                        workbook.SaveAs(path);
+                    }
+                    catch (Exception exExcel)
+                    {
+                        MessageBox.Show("Excel Export Error: " + exExcel.Message, "Excel Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
-                wsSuccess.Columns().AdjustToContents();
-
-                // ======= 填入失敗電芯 =======
-                col = 1;
-                wsFail.Cell(1, col++).Value = "ID";
-                wsFail.Cell(1, col++).Value = "Resistance(Ω)";
-                wsFail.Cell(1, col++).Value = "Voltage(V)";
-
-                if (mode == "EVE")
-                    wsFail.Cell(1, col++).Value = "Capacity";
-
-                wsFail.Cell(1, col++).Value = "Date";
-                wsFail.Cell(1, col++).Value = "Reason";
-                wsFail.Cell(1, col++).Value = "DeltaV(mV)";
-                wsFail.Cell(1, col++).Value = "DeltaDay";
-
-                if (mode == "EVE")
-                    wsFail.Cell(1, col++).Value = "DeltaCapacity";
-
-                wsFail.Cell(1, col++).Value = "GroupSize";
-                wsFail.Cell(1, col++).Value = "VoltageLimit(mV)";
-                wsFail.Cell(1, col++).Value = "IRLimit(mΩ)";
-                wsFail.Cell(1, col++).Value = "DayLimit";
-
-                if (mode == "EVE")
-                    wsFail.Cell(1, col++).Value = "CapacityLimit";
-
-                row = 2;
-                foreach (var cell in allCells.Where(c => c.Pack == null))
-                {
-                    col = 1;
-                    wsFail.Cell(row, col++).Value = cell.ID;
-                    wsFail.Cell(row, col++).Value = cell.Resistance;
-                    wsFail.Cell(row, col++).Value = cell.Voltage;
-
-                    if (mode == "EVE")
-                        wsFail.Cell(row, col++).Value = cell.Capacity;
-
-                    wsFail.Cell(row, col++).Value = cell.Date;
-                    wsFail.Cell(row, col++).Value = cell.RejectReason;
-                    wsFail.Cell(row, col++).Value = cell.DeltaV;
-                    wsFail.Cell(row, col++).Value = cell.DeltaDay;
-
-                    if (mode == "EVE")
-                        wsFail.Cell(row, col++).Value = cell.DeltaCapacity;
-
-                    wsFail.Cell(row, col++).Value = cell.GroupSize;
-                    wsFail.Cell(row, col++).Value = cell.VoltageLimit;
-                    wsFail.Cell(row, col++).Value = cell.IRLimit;
-                    wsFail.Cell(row, col++).Value = cell.DayLimit;
-
-                    if (mode == "EVE")
-                        wsFail.Cell(row, col++).Value = cell.CapacityLimit;
-
-                    row++;
-                }
-                wsFail.Columns().AdjustToContents();
-
-                // ======= 新增索引頁面 =======
-                var wsIndex = workbook.Worksheets.Add("ID_to_Pack");
-
-                // 設定標題
-                wsIndex.Cell(1, 1).Value = "ID";
-                wsIndex.Cell(1, 2).Value = "to Pack";
-
-                // 假設給使用者 50 個輸入欄位
-                int maxRows = 50;
-
-                for (int rowIndex = 2; rowIndex <= maxRows + 1; rowIndex++)
-                {
-                    // 第一欄留空給使用者輸入 ID
-                    wsIndex.Cell(rowIndex, 1).Value = "";
-
-                    // 第二欄公式查 Success 工作表 ID (B列) 對應 Pack (A列)
-                    wsIndex.Cell(rowIndex, 2).FormulaA1 =
-                         $"=IFERROR(INDEX(Success!A:A, MATCH({wsIndex.Cell(rowIndex, 1).Address}, Success!B:B, 0)), \"N/A\")";
-                }
-
-                wsIndex.Columns().AdjustToContents();
-
-
-                workbook.SaveAs(path);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("General Export Error: " + ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -475,100 +583,128 @@ namespace CellSorting
             }
         }
 
-        private List<List<BatteryCell>> GroupCells(
-    List<BatteryCell> cells,
-    int groupSize,
-    double vLimit,
-    double rLimit,
-    int dLimit)
-        {
-            var ungrouped = new LinkedList<BatteryCell>(cells.OrderBy(c => c.Voltage)); // 預排序
-            var result = new List<List<BatteryCell>>();
-            int packIndex = 1;
-
-            int totalCells = ungrouped.Count;
-            int processedCells = 0;
-
-            // 先剔除 IR 超標電芯
-            var node = ungrouped.First;
-            while (node != null)
+        private List<List<BatteryCell>> GroupCells(List<BatteryCell> cells,int groupSize,double vLimit,double rLimit,int dLimit)
             {
-                var next = node.Next;
-                var c = node.Value;
-                if (chkCheckIR.Checked && c.Resistance * 1000 > rLimit)
+                var ungrouped = new LinkedList<BatteryCell>(cells.OrderBy(c => c.Voltage)); // 預排序
+                var result = new List<List<BatteryCell>>();
+                int packIndex = 1;
+
+                int totalCells = ungrouped.Count;
+                int processedCells = 0;
+
+                // 先剔除 IR 超標電芯
+                var node = ungrouped.First;
+                while (node != null)
                 {
-                    c.RejectReason = $"內阻超標：{c.Resistance * 1000:F4} mΩ > 上限 {rLimit:F4} mΩ";
-                    c.DeltaV = 0;
-                    c.DeltaDay = 0;
-                    c.GroupSize = groupSize;
-                    c.VoltageLimit = vLimit;
-                    c.IRLimit = rLimit;
-                    c.DayLimit = dLimit;
-                    Log($"Reject IR 超標: {c.ID} ({c.RejectReason})");
-
-                    ungrouped.Remove(node);
-                    processedCells++;
-                    if (processedCells % 5 == 0)
+                    var next = node.Next;
+                    var c = node.Value;
+                    if (chkCheckIR.Checked && c.Resistance * 1000 > rLimit)
                     {
-                        int percent = 40 + (int)(35.0 * processedCells / totalCells);
-                        UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
-                    }
-                }
-                node = next;
-            }
-
-            // 分組主循環
-            while (ungrouped.Count >= groupSize)
-            {
-                // 取前 groupSize 顆作 candidate
-                var candidateGroup = ungrouped.Take(groupSize).ToList();
-
-                double deltaV = (candidateGroup.Max(c => c.Voltage) - candidateGroup.Min(c => c.Voltage)) * 1000;
-                int deltaDay = (candidateGroup.Max(c => c.Date) - candidateGroup.Min(c => c.Date)).Days;
-
-                bool violation = (chkCheckVdelta.Checked && deltaV > vLimit) ||
-                                 (chkCheckDdelta.Checked && deltaDay > dLimit) ||
-                                 (chkCheckIR.Checked && candidateGroup.Any(c => c.Resistance * 1000 > rLimit));
-
-                if (!violation)
-                {
-                    // 成功分組
-                    foreach (var c in candidateGroup)
-                    {
-                        c.Pack = packIndex;
-                        c.DeltaV = deltaV;
-                        c.DeltaDay = deltaDay;
+                        c.RejectReason = $"內阻超標：{c.Resistance * 1000:F4} mΩ > 上限 {rLimit:F4} mΩ";
+                        c.DeltaV = 0;
+                        c.DeltaDay = 0;
                         c.GroupSize = groupSize;
                         c.VoltageLimit = vLimit;
                         c.IRLimit = rLimit;
                         c.DayLimit = dLimit;
+                        Log($"Reject IR 超標: {c.ID} ({c.RejectReason})");
+
+                        ungrouped.Remove(node);
+                        processedCells++;
+                        if (processedCells % 5 == 0)
+                        {
+                            int percent = 40 + (int)(35.0 * processedCells / totalCells);
+                            UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
+                        }
                     }
-                    result.Add(candidateGroup);
-                    Log($"成功分組 Pack {packIndex}: {string.Join(", ", candidateGroup.Select(x => x.ID))} ΔV={deltaV:F1} mV ΔDay={deltaDay}");
-                    packIndex++;
+                    node = next;
+                }
 
-                    // 從 ungrouped 移除
-                    foreach (var c in candidateGroup) ungrouped.Remove(c);
+                // 分組主循環
+                while (ungrouped.Count >= groupSize)
+                {
+                    // 取前 groupSize 顆作 candidate
+                    var candidateGroup = ungrouped.Take(groupSize).ToList();
 
-                    processedCells += candidateGroup.Count;
-                    if (processedCells % 5 == 0)
+                    double deltaV = (candidateGroup.Max(c => c.Voltage) - candidateGroup.Min(c => c.Voltage)) * 1000;
+                    int deltaDay = (candidateGroup.Max(c => c.Date) - candidateGroup.Min(c => c.Date)).Days;
+
+                    bool violation = (chkCheckVdelta.Checked && deltaV > vLimit) ||
+                                     (chkCheckDdelta.Checked && deltaDay > dLimit) ||
+                                     (chkCheckIR.Checked && candidateGroup.Any(c => c.Resistance * 1000 > rLimit));
+
+                    if (!violation)
                     {
-                        int percent = 40 + (int)(35.0 * processedCells / totalCells);
-                        UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
+                        // 成功分組
+                        foreach (var c in candidateGroup)
+                        {
+                            c.Pack = packIndex;
+                            c.DeltaV = deltaV;
+                            c.DeltaDay = deltaDay;
+                            c.GroupSize = groupSize;
+                            c.VoltageLimit = vLimit;
+                            c.IRLimit = rLimit;
+                            c.DayLimit = dLimit;
+                        }
+                        result.Add(candidateGroup);
+                        Log($"成功分組 Pack {packIndex}: {string.Join(", ", candidateGroup.Select(x => x.ID))} ΔV={deltaV:F1} mV ΔDay={deltaDay}");
+                        packIndex++;
+
+                        // 從 ungrouped 移除
+                        foreach (var c in candidateGroup) ungrouped.Remove(c);
+
+                        processedCells += candidateGroup.Count;
+                        if (processedCells % 5 == 0)
+                        {
+                            int percent = 40 + (int)(35.0 * processedCells / totalCells);
+                            UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
+                        }
+                    }
+                    else
+                    {
+                        // 標記最離群或違規的電芯為 Reject
+                        var outlier = candidateGroup
+                            .OrderByDescending(c =>
+                                Math.Abs(c.Voltage - candidateGroup.Average(x => x.Voltage)) * 1000 +
+                                Math.Abs(c.Date.DayOfYear - candidateGroup.Average(x => x.Date.DayOfYear))
+                            ).First();
+
+                        outlier.RejectReason = $"無法組成有效 {groupSize} 顆組 (ΔV={deltaV:F1}, ΔDay={deltaDay}, IR={outlier.Resistance * 1000:F4})";
+                        ungrouped.Remove(outlier);
+                        Log($"Reject: {outlier.ID} ({outlier.RejectReason})");
+                        processedCells++;
+
+                        if (processedCells % 5 == 0)
+                        {
+                            int percent = 40 + (int)(35.0 * processedCells / totalCells);
+                            UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
+                        }
                     }
                 }
-                else
-                {
-                    // 標記最離群或違規的電芯為 Reject
-                    var outlier = candidateGroup
-                        .OrderByDescending(c =>
-                            Math.Abs(c.Voltage - candidateGroup.Average(x => x.Voltage)) * 1000 +
-                            Math.Abs(c.Date.DayOfYear - candidateGroup.Average(x => x.Date.DayOfYear))
-                        ).First();
 
-                    outlier.RejectReason = $"無法組成有效 {groupSize} 顆組 (ΔV={deltaV:F1}, ΔDay={deltaDay}, IR={outlier.Resistance * 1000:F4})";
-                    ungrouped.Remove(outlier);
-                    Log($"Reject: {outlier.ID} ({outlier.RejectReason})");
+                // 尾端不足組，全部 Reject
+                foreach (var c in ungrouped)
+                {
+                    double deltaV = 0;
+                    int deltaDay = 0;
+                    c.Pack = null;
+                    if (c.RejectReason == null)
+                    {
+                        c.RejectReason = $"尾端不足組或無法組成有效 {groupSize} 顆組，剩餘 {ungrouped.Count} 顆";
+                        if (ungrouped.Count > 1)
+                        {
+                            deltaV = (ungrouped.Max(x => x.Voltage) - ungrouped.Min(x => x.Voltage)) * 1000;
+                            deltaDay = (ungrouped.Max(x => x.Date) - ungrouped.Min(x => x.Date)).Days;
+                        }
+                    }
+                    c.DeltaV = deltaV;
+                    c.DeltaDay = deltaDay;
+                    c.GroupSize = groupSize;
+                    c.VoltageLimit = vLimit;
+                    c.IRLimit = rLimit;
+                    c.DayLimit = dLimit;
+
+                    Log($"尾端標記 Reject: {c.ID} ({c.RejectReason})");
                     processedCells++;
 
                     if (processedCells % 5 == 0)
@@ -577,52 +713,11 @@ namespace CellSorting
                         UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
                     }
                 }
+
+                return result;
             }
 
-            // 尾端不足組，全部 Reject
-            foreach (var c in ungrouped)
-            {
-                double deltaV = 0;
-                int deltaDay = 0;
-                c.Pack = null;
-                if (c.RejectReason == null)
-                {
-                    c.RejectReason = $"尾端不足組或無法組成有效 {groupSize} 顆組，剩餘 {ungrouped.Count} 顆";
-                    if (ungrouped.Count > 1)
-                    {
-                        deltaV = (ungrouped.Max(x => x.Voltage) - ungrouped.Min(x => x.Voltage)) * 1000;
-                        deltaDay = (ungrouped.Max(x => x.Date) - ungrouped.Min(x => x.Date)).Days;
-                    }
-                }
-                c.DeltaV = deltaV;
-                c.DeltaDay = deltaDay;
-                c.GroupSize = groupSize;
-                c.VoltageLimit = vLimit;
-                c.IRLimit = rLimit;
-                c.DayLimit = dLimit;
-
-                Log($"尾端標記 Reject: {c.ID} ({c.RejectReason})");
-                processedCells++;
-
-                if (processedCells % 5 == 0)
-                {
-                    int percent = 40 + (int)(35.0 * processedCells / totalCells);
-                    UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
-                }
-            }
-
-            return result;
-        }
-
-
-        private List<List<BatteryCell>> GroupCellsEVE(
-    List<BatteryCell> cells,
-    int groupSize,
-    double vLimit,
-    double rLimit,
-    double dLimit,
-    double cLimit
-)
+        private List<List<BatteryCell>> GroupCellsEVE( List<BatteryCell> cells, int groupSize, double vLimit, double rLimit, double dLimit, double cLimit)
         {
             var processedSet = new HashSet<string>();
             var result = new List<List<BatteryCell>>();
@@ -656,20 +751,7 @@ namespace CellSorting
             return result;
         }
 
-        private List<List<BatteryCell>> GroupCellsBySubsetRetry(
-            List<BatteryCell> subset,
-            int groupSize,
-            double vLimit,
-            double rLimit,
-            double dLimit,
-            double cLimit,
-            ref int packIndex,
-            ref int processedCells,
-            int totalCells,
-            HashSet<string> processedSet,
-            Dictionary<string, int> retryCount,
-            int maxRetry
-        )
+        private List<List<BatteryCell>> GroupCellsBySubsetRetry(List<BatteryCell> subset,int groupSize,double vLimit,double rLimit,double dLimit,double cLimit,ref int packIndex,ref int processedCells,int totalCells,HashSet<string> processedSet,Dictionary<string, int> retryCount,int maxRetry)
         {
             var result = new List<List<BatteryCell>>();
             var ungrouped = new LinkedList<BatteryCell>(subset.OrderBy(c => c.Voltage));
@@ -784,6 +866,7 @@ namespace CellSorting
             int percent = 40 + (int)(35.0 * processedCells / totalCells);
             UpdateProgress(percent, $"分組中...已處理 {processedCells}/{totalCells} 顆");
         }
+        
         /// <summary>
         /// 取得電芯ID前綴（例如 "H9250E1GP1107270" → "H9250"）
         /// </summary>
@@ -883,9 +966,9 @@ namespace CellSorting
             var btn = sender as System.Windows.Forms.Button;
             if (btn != null)
             {
-                btn.BackColor = SystemColors.Control; // 恢復預設背景
-                btn.ForeColor = SystemColors.ControlText; // 恢復文字顏色
-                btn.Font = new System.Drawing.Font(btn.Font, FontStyle.Regular); // 恢復普通字體
+                btn.BackColor = System.Drawing.Color.FromArgb(72, 201, 176); // 恢復預設背景
+                btn.ForeColor = System.Drawing.Color.White; // 恢復文字顏色
+                btn.Font = new System.Drawing.Font(btn.Font, FontStyle.Bold); // 恢復普通字體
             }
         }
 
@@ -973,6 +1056,18 @@ namespace CellSorting
                 chkCheckCapacity.Checked = true;
                 chkCheckCapacity.Enabled = true;
             }
+        }
+
+        private void btnHistory_Click(object sender, EventArgs e)
+        {
+            // 建立 Form2dbshow 的新實例
+            Form2dbshow dbForm = new Form2dbshow();
+
+            // 顯示表單（非模態）
+            dbForm.Show();
+
+            // 如果想要模態對話框（使用者必須關閉才能返回主表單）
+            // dbForm.ShowDialog();
         }
 
     }
